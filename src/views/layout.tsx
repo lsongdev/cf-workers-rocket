@@ -16,11 +16,11 @@ export function Layout(props: {
         <link rel="stylesheet" href="/rocket.css" />
       </head>
       <body>
-        <header>
-          <a class="brand" href={props.admin ? "/admin" : "/"}>🚀 Rocket</a>
+        <header class="navbar">
+          <a class="navbar-brand" href={props.admin ? "/admin" : "/"}>🚀 Rocket</a>
           {props.admin && (
             <nav>
-              <a class="button outline" href="/admin/logout">Sign out</a>
+              <a class="button button-link" href="/admin/logout">Sign out</a>
             </nav>
           )}
         </header>

@@ -10,23 +10,6 @@ export function hex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function randomToken(bytes = 32): string {
-  const value = new Uint8Array(bytes);
-  crypto.getRandomValues(value);
-  return base64Url(value);
-}
-
-export function randomHex(bytes = 16): string {
-  const value = new Uint8Array(bytes);
-  crypto.getRandomValues(value);
-  return hex(value);
-}
-
-export async function sha256(value: string | ArrayBuffer): Promise<string> {
-  const input = typeof value === "string" ? encoder.encode(value) : value;
-  return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", input)));
-}
-
 const R = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
   0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -107,6 +90,3 @@ export async function sha224(value: string): Promise<string> {
   return hex(out);
 }
 
-export function now(): number {
-  return Math.floor(Date.now() / 1000);
-}

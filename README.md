@@ -15,7 +15,7 @@ A **Trojan + VLESS proxy** running on Cloudflare Workers, with an admin panel fo
 
 - **Trojan & VLESS protocol support** over WebSocket
 - **Admin dashboard** — create, enable/disable, and delete users via browser
-- **D1 database** — persistent user storage with in-memory caching
+- **KV storage** — persistent user storage with KV edge caching
 - **Connection links** — generate client URLs for VLESS, Trojan, Clash, and Shadowrocket
 - **UDP DNS proxying** — DNS (port 53) via Cloudflare DNS-over-HTTPS
 - **Fallback proxy** — optional `PROXYIP` for retry on connection failure
@@ -24,7 +24,7 @@ A **Trojan + VLESS proxy** running on Cloudflare Workers, with an admin panel fo
 
 - [Node.js](https://nodejs.org/) + [pnpm](https://pnpm.io/)
 - [Cloudflare account](https://dash.cloudflare.com/) with Wrangler authenticated (`wrangler login`)
-- A [D1 database](https://developers.cloudflare.com/d1/) created and bound to the worker
+- A [KV namespace](https://developers.cloudflare.com/kv/) created and bound to the worker (`wrangler kv namespace create KV`, then fill its `id` into `wrangler.jsonc`)
 
 ## Quick Start
 
@@ -45,8 +45,7 @@ pnpm run dev                     # start local dev server
 
 | Variable | Required | Description |
 |---|---|---|
-| `ACCESS_TOKEN` | Yes | Admin panel login password |
-| `SESSION_SECRET` | Yes | Key for signing session cookies (64-char hex) |
+| `ACCESS_TOKEN` | Yes | Admin panel login password (also stored in the session cookie) |
 | `PROXYIP` | No | Fallback proxy IP for retry on failure |
 
 Set them via `wrangler secret put <NAME>` for production, or in `.dev.vars` for local dev.
@@ -58,7 +57,7 @@ Set them via `wrangler secret put <NAME>` for production, or in `.dev.vars` for 
 | `pnpm run dev` | Start dev server on `0.0.0.0:8787` |
 | `pnpm run start` | Start dev server on `localhost:8787` |
 | `pnpm run deploy` | Deploy worker to Cloudflare |
-| `pnpm run deploy:production` | Run D1 migrations + deploy |
+| `pnpm test` | Run storage and authentication regression tests |
 | `pnpm run typecheck` | Run TypeScript type checking |
 | `pnpm run types` | Generate Worker types from `wrangler.jsonc` |
 
@@ -80,6 +79,17 @@ Set them via `wrangler secret put <NAME>` for production, or in `.dev.vars` for 
 | `GET /link/clash/:uuid` | Clash YAML config |
 | `GET /link/shadowrocket/:uuid` | Shadowrocket config |
 
+## Storage
+
+User data is stored in a Workers KV namespace (`KV` binding): each user is a JSON record keyed by `user:<uuid>`. The secondary `user:hash:<sha224>` key stores only the UUID; Trojan resolves this pointer and checks the canonical user record, just like VLESS. The admin panel paginates KV keys and sorts records by creation time, without a shared mutable index.
+
+When upgrading from D1, back up and copy existing users into KV before deployment. Preserve UUIDs, names, enabled flags, and timestamps, set each record’s `id` to its UUID, and create hash pointers using SHA-224 of the UUID. Switching the binding alone does not migrate data.
+
+[KV is eventually consistent](https://developers.cloudflare.com/kv/concepts/how-kv-works/): creation, status changes, and deletion may take 60 seconds or longer to propagate, including in the admin list. There is no additional application cache. Avoid simultaneous edits to the same user; KV has no transactions and limits writes to the same key to one per second. Disabling a user affects new connections after propagation; existing proxy connections remain open. Use a strongly consistent store if immediate revocation or concurrent administration is required.
+
+## Architecture
+
+The worker uses the [Hono](https://hono.dev/) framework. Admin authentication stores `ACCESS_TOKEN` directly in an `HttpOnly` cookie (4-hour TTL) and compares it on each request. Proxy handlers authenticate users against KV and pipe TCP traffic bidirectionally over WebSocket. Each new proxy connection reads KV; both protocols use the canonical user status.
 
 # License
 

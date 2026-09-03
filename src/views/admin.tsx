@@ -9,21 +9,21 @@ export function AdminPage(props: {
   return (
     <Layout title="Dashboard" admin error={props.error}>
 
-      <section style="margin-bottom:2rem;padding:1.25rem;border:1px solid var(--border);border-radius:8px;background:var(--card-bg)">
+      <section class="card" >
         <h2 style="margin-bottom:1rem">Add User</h2>
-        <form method="post" action="/admin/users">
+        <form method="post" action="/admin/users" class="form">
           <div class="form-group">
             <label for="name">Name</label>
-            <input type="text" id="name" name="name" required placeholder="e.g. alice" />
+            <input class={"input"} type="text" id="name" name="name" required placeholder="e.g. alice" />
           </div>
-          <button type="submit">Generate & Add</button>
+          <button type="submit" class="button">Generate & Add</button>
         </form>
       </section>
 
       {props.users.length === 0 ? (
         <div class="empty">No users yet. Add your first user above.</div>
       ) : (
-        <table style="white-space:nowrap">
+        <table class="table" >
           <thead>
             <tr>
               <th>Name</th>
@@ -36,31 +36,33 @@ export function AdminPage(props: {
             {props.users.map((user) => (
               <tr key={user.id}>
                 <td><strong>{user.name}</strong></td>
-                <td class="mono">{user.uuid}</td>
+                <td class="mono">
+                  <b>{user.uuid}</b>
+                  <em class="flex gap-5 flex-wrap">
+                    <a class="" href={`/link/vless/${user.uuid}`} target="_blank">VLESS</a>
+                    <a class="" href={`/link/trojan/${user.uuid}`} target="_blank">Trojan</a>
+                    <a class="" href={`/link/clash/${user.uuid}`} target="_blank">Clash</a>
+                    <a class="" href={`/link/shadowrocket/${user.uuid}`} target="_blank">Shadowrocket</a>
+                  </em>
+                </td>
                 <td>
                   <span class={`tag ${user.enabled ? "active" : "inactive"}`}>
                     {user.enabled ? "active" : "disabled"}
                   </span>
                 </td>
                 <td>
-                  <div class="button-group">
-                    <form method="post" action={`/admin/users/${user.id}/toggle`} style="display:inline">
-                      <button type="submit" class="outline" style="font-size:.8rem;padding:.3rem .6rem">
+                  <div class="flex gap-5 flex-center">
+                    <form method="post" action={`/admin/users/${user.id}/toggle`}>
+                      <input type="hidden" name="enabled" value={user.enabled === 1 ? "0" : "1"} />
+                      <button type="submit" class="button button-small" style="font-size:.8rem;padding:.3rem .6rem">
                         {user.enabled ? "Disable" : "Enable"}
                       </button>
                     </form>
-                    <form method="post" action={`/admin/users/${user.id}/delete`} style="display:inline"
+                    <form method="post" action={`/admin/users/${user.id}/delete`}
                       onsubmit="return confirm('Delete user &quot;{user.name}&quot;?')">
-                      <button type="submit" class="danger" style="font-size:.8rem;padding:.3rem .6rem">Delete</button>
+                      <button type="submit" class="button button-small button-danger" style="font-size:.8rem;padding:.3rem .6rem">Delete</button>
                     </form>
-                    <a class="button outline" style="font-size:.8rem;padding:.3rem .6rem"
-                       href={`/link/vless/${user.uuid}`} target="_blank">VLESS</a>
-                    <a class="button outline" style="font-size:.8rem;padding:.3rem .6rem"
-                       href={`/link/trojan/${user.uuid}`} target="_blank">Trojan</a>
-                    <a class="button outline" style="font-size:.8rem;padding:.3rem .6rem"
-                       href={`/link/clash/${user.uuid}`} target="_blank">Clash</a>
-                    <a class="button outline" style="font-size:.8rem;padding:.3rem .6rem"
-                       href={`/link/shadowrocket/${user.uuid}`} target="_blank">Shadowrocket</a>
+
                   </div>
                 </td>
               </tr>

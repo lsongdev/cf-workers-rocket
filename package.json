@@ -6,11 +6,11 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
-    "deploy:production": "wrangler d1 migrations apply rocket --remote && wrangler deploy",
     "dev": "wrangler dev --ip 0.0.0.0",
     "start": "wrangler dev",
     "typecheck": "tsc --noEmit",
-    "types": "wrangler types"
+    "types": "wrangler types src/worker-configuration.d.ts --include-runtime false",
+    "test": "tsx --test tests/*.test.ts"
   },
   "license": "MIT",
   "dependencies": {
@@ -19,6 +19,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260729.1",
     "@types/node": "^24.0.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.2",
     "wrangler": "^4.115.0"
   },

@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { createAdminSession, currentAdmin, requireAdmin, revokeAdminSession } from "./auth";
 
-import { clearUserCache, lookupUserByUUID } from "./proxy/common";
+import { lookupUserByUUID } from "./proxy/common";
+import { createUser, deleteUser, listUsers, setUserEnabled } from "./store";
 import { trojanOverWSHandler } from "./proxy/trojan";
 import { vlessOverWSHandler } from "./proxy/vless";
 import { sha224 } from "./crypto";
@@ -42,11 +43,9 @@ app.get("/admin/logout", async (context) => {
 
 app.get("/admin", async (context) => {
   if (!(await requireAdmin(context))) return context.redirect("/admin/login");
-  const users = await context.env.DB.prepare(
-    "SELECT * FROM users ORDER BY created_at DESC",
-  ).all<User>();
+  const users = await listUsers(context.env);
   const host = context.req.header("Host") || "localhost:8787";
-  return context.html(<AdminPage users={users.results} host={host} />);
+  return context.html(<AdminPage users={users} host={host} />);
 });
 
 app.post("/admin/users", async (context) => {
@@ -54,21 +53,18 @@ app.post("/admin/users", async (context) => {
   const body = await formBody(context.req.raw);
   const name = body.name?.trim();
   if (!name) {
-    const users = await context.env.DB.prepare("SELECT * FROM users ORDER BY created_at DESC").all<User>();
+    const users = await listUsers(context.env);
     const host = context.req.header("Host") || "localhost:8787";
-    return context.html(<AdminPage users={users.results} host={host} error="Name is required." />, 400);
+    return context.html(<AdminPage users={users} host={host} error="Name is required." />, 400);
   }
   const uuid = crypto.randomUUID();
   const uuidHash = await sha224(uuid);
   try {
-    await context.env.DB.prepare(
-      "INSERT INTO users (name, uuid, uuid_hash) VALUES (?, ?, ?)",
-    ).bind(name, uuid, uuidHash).run();
-    clearUserCache();
+    await createUser(context.env, name, uuid, uuidHash);
   } catch {
-    const users = await context.env.DB.prepare("SELECT * FROM users ORDER BY created_at DESC").all<User>();
+    const users = await listUsers(context.env);
     const host = context.req.header("Host") || "localhost:8787";
-    return context.html(<AdminPage users={users.results} host={host} error="Failed to create user." />, 400);
+    return context.html(<AdminPage users={users} host={host} error="Failed to create user." />, 400);
   }
   return context.redirect("/admin");
 });
@@ -76,21 +72,16 @@ app.post("/admin/users", async (context) => {
 app.post("/admin/users/:id/toggle", async (context) => {
   if (!(await requireAdmin(context))) return context.redirect("/admin/login");
   const id = context.req.param("id");
-  const user = await context.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<User>();
-  if (user) {
-    await context.env.DB.prepare("UPDATE users SET enabled = ?, updated_at = datetime('now') WHERE id = ?")
-      .bind(user.enabled ? 0 : 1, id)
-      .run();
-    clearUserCache();
-  }
+  const body = await formBody(context.req.raw);
+  if (body.enabled !== "0" && body.enabled !== "1") return context.text("Invalid status", 400);
+  await setUserEnabled(context.env, id, body.enabled === "1");
   return context.redirect("/admin");
 });
 
 app.post("/admin/users/:id/delete", async (context) => {
   if (!(await requireAdmin(context))) return context.redirect("/admin/login");
   const id = context.req.param("id");
-  await context.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
-  clearUserCache();
+  await deleteUser(context.env, id);
   return context.redirect("/admin");
 });
 

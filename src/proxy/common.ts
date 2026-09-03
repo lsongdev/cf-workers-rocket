@@ -1,75 +1,9 @@
 import type { User } from "../types";
-// import { sha224 } from "../crypto";
+import { getUser, getUserByHash } from "../store";
 
 export const WS_READY_STATE_OPEN = 1;
 
-const CACHE_TTL = 300_000;
-const POSITIVE_CACHE_MAX = 256;
-const NEGATIVE_CACHE_MAX = 512;
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
-
-const userCache = new Map<string, { user: User; expires: number }>();
-const missingUserCache = new Map<string, number>();
-
-function getCachedUser(key: string): User | null | undefined {
-  const cached = userCache.get(key);
-  if (cached) {
-    if (cached.expires <= Date.now()) {
-      userCache.delete(key);
-    } else {
-      userCache.delete(key);
-      userCache.set(key, cached);
-      return cached.user;
-    }
-  }
-
-  const missingExpires = missingUserCache.get(key);
-  if (missingExpires === undefined) return undefined;
-  if (missingExpires <= Date.now()) {
-    missingUserCache.delete(key);
-    return undefined;
-  }
-  missingUserCache.delete(key);
-  missingUserCache.set(key, missingExpires);
-  return null;
-}
-
-function cacheUser(key: string, user: User | null): void {
-  const now = Date.now();
-  pruneExpiredCache(now);
-
-  if (user) {
-    missingUserCache.delete(key);
-    setBounded(userCache, key, { user, expires: now + CACHE_TTL }, POSITIVE_CACHE_MAX);
-  } else {
-    userCache.delete(key);
-    setBounded(missingUserCache, key, now + CACHE_TTL, NEGATIVE_CACHE_MAX);
-  }
-}
-
-function pruneExpiredCache(now: number): void {
-  for (const [key, cached] of userCache) {
-    if (cached.expires <= now) userCache.delete(key);
-  }
-  for (const [key, expires] of missingUserCache) {
-    if (expires <= now) missingUserCache.delete(key);
-  }
-}
-
-function setBounded<T>(cache: Map<string, T>, key: string, value: T, maxSize: number): void {
-  cache.delete(key);
-  while (cache.size >= maxSize) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey === undefined) break;
-    cache.delete(oldestKey);
-  }
-  cache.set(key, value);
-}
-
-export function clearUserCache(): void {
-  userCache.clear();
-  missingUserCache.clear();
-}
 
 export function safeCloseWebSocket(socket: WebSocket): void {
   try {
@@ -172,34 +106,14 @@ export async function lookupUserByUUID(env: Env, uuid: string): Promise<User | n
   const normalizedUUID = uuid.toLowerCase();
   if (!UUID_PATTERN.test(normalizedUUID)) return null;
 
-  const cacheKey = `uuid:${normalizedUUID}`;
-  const cached = getCachedUser(cacheKey);
-  if (cached !== undefined) return cached;
-
-  const user = await env.DB.prepare("SELECT * FROM users WHERE uuid = ? AND enabled = 1")
-    .bind(normalizedUUID)
-    .first<User>();
-  cacheUser(cacheKey, user || null);
-  return user;
+  const stored = await getUser(env, normalizedUUID);
+  return stored && stored.enabled === 1 ? stored : null;
 }
 
 export async function lookupTrojanUser(env: Env, passwordHash: string): Promise<User | null> {
   const normalizedHash = passwordHash.toLowerCase();
   if (!/^[0-9a-f]{56}$/.test(normalizedHash)) return null;
 
-  const cacheKey = `trojan:${normalizedHash}`;
-  const cached = getCachedUser(cacheKey);
-  if (cached !== undefined) return cached;
-
-  const user = await env.DB.prepare(
-    "SELECT * FROM users WHERE uuid_hash = ? AND enabled = 1",
-  ).bind(normalizedHash).first<User>();
-
-  if (user) {
-    cacheUser(cacheKey, user);
-    cacheUser(`uuid:${user.uuid.toLowerCase()}`, user);
-    return user;
-  }
-  cacheUser(cacheKey, null);
-  return null;
+  const stored = await getUserByHash(env, normalizedHash);
+  return stored && stored.enabled === 1 ? stored : null;
 }

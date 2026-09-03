@@ -11,12 +11,10 @@
   "vars": {
     "APP_URL": "http://localhost:8787"
   },
-  "d1_databases": [
+  "kv_namespaces": [
     {
-      "binding": "DB",
-      "database_name": "rocket",
-      "database_id": "50caa101-52be-41dd-9581-80c24978253f",
-      "migrations_dir": "./migrations"
+      "binding": "KV",
+      "id": "0dffbe19c6c74d94a51facfd27dd99a1"
     }
   ]
 }
