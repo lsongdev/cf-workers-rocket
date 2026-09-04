@@ -5,6 +5,7 @@
   "description": "Trojan + VLESS proxy on Cloudflare Workers with admin panel",
   "type": "module",
   "scripts": {
+    "build": "wrangler build",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev --ip 0.0.0.0",
     "start": "wrangler dev",
